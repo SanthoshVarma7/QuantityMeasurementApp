@@ -15,22 +15,26 @@ interface IMeasurable {
 
 enum LengthUnit implements IMeasurable {
     FEET(12.0), INCHES(1.0), YARDS(36.0), CENTIMETERS(0.393701);
-
-    private final double conversionFactor;
-    LengthUnit(double conversionFactor) { this.conversionFactor = conversionFactor; }
-
-    @Override
-    public double getConversionFactor() { return conversionFactor; }
+    private final double factor;
+    LengthUnit(double factor) { this.factor = factor; }
+    @Override public double getConversionFactor() { return factor; }
 }
 
 enum WeightUnit implements IMeasurable {
     GRAM(1.0), KILOGRAM(1000.0), POUND(453.592), TONNE(1000000.0);
+    private final double factor;
+    WeightUnit(double factor) { this.factor = factor; }
+    @Override public double getConversionFactor() { return factor; }
+}
+
+enum VolumeUnit implements IMeasurable {
+    LITRE(1.0), // Base Unit
+    MILLILITRE(0.001),
+    GALLON(3.78541);
 
     private final double conversionFactor;
-    WeightUnit(double conversionFactor) { this.conversionFactor = conversionFactor; }
-
-    @Override
-    public double getConversionFactor() { return conversionFactor; }
+    VolumeUnit(double conversionFactor) { this.conversionFactor = conversionFactor; }
+    @Override public double getConversionFactor() { return conversionFactor; }
 }
 
 class Quantity<U extends IMeasurable> {
@@ -44,7 +48,6 @@ class Quantity<U extends IMeasurable> {
     }
 
     public double getValue() { return value; }
-    public U getUnit() { return unit; }
 
     private double getInBaseUnit() {
         double raw = unit.convertToBase(value);
@@ -52,8 +55,8 @@ class Quantity<U extends IMeasurable> {
     }
 
     public Quantity<U> add(Quantity<U> that, U targetUnit) {
-        double sumInBase = this.getInBaseUnit() + that.getInBaseUnit();
-        double converted = targetUnit.fromBase(sumInBase);
+        double totalBase = this.getInBaseUnit() + that.getInBaseUnit();
+        double converted = targetUnit.fromBase(totalBase);
         return new Quantity<>(Math.round(converted * 1000.0) / 1000.0, targetUnit);
     }
 
@@ -72,44 +75,44 @@ class Quantity<U extends IMeasurable> {
 
 public class QuantityMeasurementApp {
     public static void main(String[] args) {
-        Quantity<LengthUnit> ft = new Quantity<>(1.0, LengthUnit.FEET);
-        Quantity<LengthUnit> in = new Quantity<>(12.0, LengthUnit.INCHES);
-        System.out.println(ft.equals(in));
+        Quantity<VolumeUnit> gallon = new Quantity<>(1.0, VolumeUnit.GALLON);
+        Quantity<VolumeUnit> litres = new Quantity<>(3.785, VolumeUnit.LITRE);
+        System.out.println("1 Gallon == 3.785 Litres: " + gallon.equals(litres));
 
-        Quantity<WeightUnit> kg = new Quantity<>(1.0, WeightUnit.KILOGRAM);
-        Quantity<WeightUnit> lb = new Quantity<>(2.205, WeightUnit.POUND);
-        System.out.println(kg.equals(lb));
+        Quantity<VolumeUnit> ml = new Quantity<>(1000.0, VolumeUnit.MILLILITRE);
+        Quantity<VolumeUnit> l = new Quantity<>(1.0, VolumeUnit.LITRE);
+        System.out.println("1000ml + 1L in Litres: " + ml.add(l, VolumeUnit.LITRE));
     }
 }
 
 class QuantityMeasurementAppTest {
 
     @Test
-    public void testLengthEquality() {
-        Quantity<LengthUnit> f1 = new Quantity<>(1.0, LengthUnit.FEET);
-        Quantity<LengthUnit> i1 = new Quantity<>(12.0, LengthUnit.INCHES);
-        assertTrue(f1.equals(i1));
+    public void testVolumeEquality() {
+        Quantity<VolumeUnit> l = new Quantity<>(1.0, VolumeUnit.LITRE);
+        Quantity<VolumeUnit> ml = new Quantity<>(1000.0, VolumeUnit.MILLILITRE);
+        assertTrue(l.equals(ml));
     }
 
     @Test
-    public void testWeightEquality() {
-        Quantity<WeightUnit> kg = new Quantity<>(1.0, WeightUnit.KILOGRAM);
-        Quantity<WeightUnit> grams = new Quantity<>(1000.0, WeightUnit.GRAM);
-        assertTrue(kg.equals(grams));
+    public void testGallonToLitreEquality() {
+        Quantity<VolumeUnit> gal = new Quantity<>(1.0, VolumeUnit.GALLON);
+        Quantity<VolumeUnit> litre = new Quantity<>(3.785, VolumeUnit.LITRE);
+        assertTrue(gal.equals(litre));
     }
 
     @Test
-    public void testAddition() {
-        Quantity<LengthUnit> l1 = new Quantity<>(1.0, LengthUnit.FEET);
-        Quantity<LengthUnit> l2 = new Quantity<>(12.0, LengthUnit.INCHES);
-        Quantity<LengthUnit> result = l1.add(l2, LengthUnit.FEET);
-        assertEquals(2.0, result.getValue());
+    public void testVolumeAddition() {
+        Quantity<VolumeUnit> l = new Quantity<>(1.0, VolumeUnit.LITRE);
+        Quantity<VolumeUnit> gal = new Quantity<>(1.0, VolumeUnit.GALLON); // 3.785L
+        Quantity<VolumeUnit> result = l.add(gal, VolumeUnit.LITRE);
+        assertEquals(4.785, result.getValue());
     }
 
     @Test
-    public void testTypeSafety() {
-        Quantity<LengthUnit> length = new Quantity<>(1.0, LengthUnit.FEET);
+    public void testCrossCategorySafety() {
+        Quantity<VolumeUnit> volume = new Quantity<>(1.0, VolumeUnit.LITRE);
         Quantity<WeightUnit> weight = new Quantity<>(1.0, WeightUnit.KILOGRAM);
-        assertFalse(length.equals(weight));
+        assertFalse(volume.equals(weight));
     }
 }
