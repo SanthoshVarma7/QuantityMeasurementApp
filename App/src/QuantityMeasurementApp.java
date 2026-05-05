@@ -1,15 +1,18 @@
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
-enum LengthUnit {
-    FEET(12.0),
-    INCHES(1.0),
-    YARDS(36.0),
-    CENTIMETERS(0.393701);
+// --- WEIGHT CATEGORY ---
+
+enum WeightUnit {
+    MILLIGRAM(0.001),
+    GRAM(1.0), // Base Unit
+    KILOGRAM(1000.0),
+    POUND(453.592),
+    TONNE(1000000.0);
 
     private final double conversionFactor;
 
-    LengthUnit(double conversionFactor) {
+    WeightUnit(double conversionFactor) {
         this.conversionFactor = conversionFactor;
     }
 
@@ -22,77 +25,119 @@ enum LengthUnit {
     }
 }
 
-class QuantityLength {
+class Weight {
     private final double value;
-    private final LengthUnit unit;
+    private final WeightUnit unit;
 
-    public QuantityLength(double value, LengthUnit unit) {
+    public Weight(double value, WeightUnit unit) {
+        if (unit == null) throw new IllegalArgumentException("Unit cannot be null");
         this.value = value;
         this.unit = unit;
     }
 
     public double getValue() { return value; }
-    public LengthUnit getUnit() { return unit; }
+    public WeightUnit getUnit() { return unit; }
 
-    public double getInBaseUnit() {
-        return unit.convertToBase(value);
+    private double convertToBaseUnit() {
+        double raw = unit.convertToBase(value);
+        return Math.round(raw * 100.0) / 100.0;
     }
 
-    public static QuantityLength add(QuantityLength l1, QuantityLength l2, LengthUnit targetUnit) {
-        if (l1 == null || l2 == null || targetUnit == null) {
-            throw new IllegalArgumentException("Parameters cannot be null");
-        }
-        double sumInBase = l1.getInBaseUnit() + l2.getInBaseUnit();
-        double convertedValue = targetUnit.fromBase(sumInBase);
-        return new QuantityLength(Math.round(convertedValue * 1000.0) / 1000.0, targetUnit);
+    public Weight add(Weight that, WeightUnit targetUnit) {
+        double totalBase = this.convertToBaseUnit() + that.convertToBaseUnit();
+        double converted = targetUnit.fromBase(totalBase);
+        return new Weight(Math.round(converted * 100.0) / 100.0, targetUnit);
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        QuantityLength that = (QuantityLength) o;
-        return Double.compare(Math.round(this.getInBaseUnit() * 1000.0) / 1000.0,
-                Math.round(that.getInBaseUnit() * 1000.0) / 1000.0) == 0;
+        Weight that = (Weight) o;
+        return Double.compare(this.convertToBaseUnit(), that.convertToBaseUnit()) == 0;
     }
 
     @Override
     public String toString() { return value + " " + unit; }
 }
 
-public class QuantityMeasurementApp {
-    public static void main(String[] args) {
-        QuantityLength feet = new QuantityLength(1.0, LengthUnit.FEET);
-        QuantityLength inches = new QuantityLength(12.0, LengthUnit.INCHES);
+// --- LENGTH CATEGORY (From UC8) ---
 
-        System.out.println("Equality: " + feet.equals(inches));
-        System.out.println("Addition (Result in Yards): " + QuantityLength.add(feet, inches, LengthUnit.YARDS));
+enum LengthUnit {
+    FEET(12.0), INCHES(1.0), YARDS(36.0), CENTIMETERS(0.393701);
+    private final double factor;
+    LengthUnit(double factor) { this.factor = factor; }
+    public double convertToBase(double v) { return v * factor; }
+    public double fromBase(double v) { return v / factor; }
+}
+
+class Length {
+    private final double value;
+    private final LengthUnit unit;
+    public Length(double v, LengthUnit u) { this.value = v; this.unit = u; }
+    private double toBase() { return Math.round(unit.convertToBase(value) * 100.0) / 100.0; }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Length that = (Length) o;
+        return Double.compare(this.toBase(), that.toBase()) == 0;
     }
 }
+
+// --- MAIN APPLICATION ---
+
+public class QuantityMeasurementApp {
+    public static void main(String[] args) {
+        Weight kg = new Weight(1.0, WeightUnit.KILOGRAM);
+        Weight grams = new Weight(1000.0, WeightUnit.GRAM);
+        System.out.println("1kg == 1000g: " + kg.equals(grams));
+
+        Weight lb = new Weight(1.0, WeightUnit.POUND);
+        Weight sum = kg.add(lb, WeightUnit.GRAM);
+        System.out.println("1kg + 1lb in Grams: " + sum);
+    }
+}
+
+// --- TEST SUITE ---
 
 class QuantityMeasurementAppTest {
 
     @Test
-    public void testDelegatedConversion() {
-        QuantityLength yard = new QuantityLength(1.0, LengthUnit.YARDS);
-        assertEquals(36.0, yard.getInBaseUnit());
+    public void testWeightEquality_SameUnit() {
+        Weight w1 = new Weight(10.0, WeightUnit.GRAM);
+        Weight w2 = new Weight(10.0, WeightUnit.GRAM);
+        assertEquals(w1, w2);
     }
 
     @Test
-    public void testAdditionWithTargetUnit() {
-        QuantityLength l1 = new QuantityLength(1.0, LengthUnit.FEET);
-        QuantityLength l2 = new QuantityLength(12.0, LengthUnit.INCHES);
-        QuantityLength result = QuantityLength.add(l1, l2, LengthUnit.YARDS);
-
-        // 1ft + 12in = 24 inches = 0.667 Yards
-        assertEquals(0.667, result.getValue());
-        assertEquals(LengthUnit.YARDS, result.getUnit());
+    public void testWeightEquality_DifferentUnit() {
+        Weight kg = new Weight(1.0, WeightUnit.KILOGRAM);
+        Weight grams = new Weight(1000.0, WeightUnit.GRAM);
+        assertTrue(kg.equals(grams));
     }
 
     @Test
-    public void testEqualityAcrossUnits() {
-        QuantityLength cm = new QuantityLength(30.48, LengthUnit.CENTIMETERS);
-        QuantityLength foot = new QuantityLength(1.0, LengthUnit.FEET);
-        assertTrue(cm.equals(foot));
+    public void testWeightAddition() {
+        Weight kg = new Weight(1.0, WeightUnit.KILOGRAM); // 1000g
+        Weight grams = new Weight(500.0, WeightUnit.GRAM); // 500g
+        Weight result = kg.add(grams, WeightUnit.KILOGRAM);
+        assertEquals(1.5, result.getValue());
+    }
+
+    @Test
+    public void testPoundToGramEquality() {
+        Weight lb = new Weight(1.0, WeightUnit.POUND);
+        Weight grams = new Weight(453.59, WeightUnit.GRAM);
+        assertTrue(lb.equals(grams));
+    }
+
+    @Test
+    public void testTypeSafety_WeightNotEqualToLength() {
+        Weight weight = new Weight(1.0, WeightUnit.KILOGRAM);
+        Length length = new Length(1.0, LengthUnit.FEET);
+        // This will return false due to getClass() check in equals()
+        assertFalse(weight.equals(length));
     }
 }
