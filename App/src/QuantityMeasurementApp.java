@@ -4,20 +4,11 @@ import static org.junit.jupiter.api.Assertions.*;
 public class QuantityMeasurementApp {
 
     public enum LengthUnit {
-        FEET(12.0),
-        INCHES(1.0),
-        YARDS(36.0),
-        CENTIMETERS(0.393701);
+        FEET(12.0), INCHES(1.0), YARDS(36.0), CENTIMETERS(0.393701);
 
         private final double conversionFactor;
-
-        LengthUnit(double conversionFactor) {
-            this.conversionFactor = conversionFactor;
-        }
-
-        public double getConversionFactor() {
-            return conversionFactor;
-        }
+        LengthUnit(double conversionFactor) { this.conversionFactor = conversionFactor; }
+        public double getConversionFactor() { return conversionFactor; }
     }
 
     public static class Length {
@@ -29,29 +20,19 @@ public class QuantityMeasurementApp {
             this.unit = unit;
         }
 
-        public double getValue() {
-            return value;
-        }
+        /**
+         * UC6: Addition of two lengths.
+         * Normalizes both to inches, adds them, and converts back to the unit of this instance.
+         */
+        public Length add(Length thatLength) {
+            if (thatLength == null) {
+                throw new IllegalArgumentException("Operand cannot be null"); //
+            }
+            double totalInches = (this.value * this.unit.getConversionFactor()) +
+                    (thatLength.value * thatLength.unit.getConversionFactor()); //
 
-        public LengthUnit getUnit() {
-            return unit;
-        }
-
-        private double convertToBaseUnit() {
-            double rawValue = this.value * this.unit.getConversionFactor();
-            return Math.round(rawValue * 1000000.0) / 1000000.0;
-        }
-
-        public static double convert(double value, LengthUnit fromUnit, LengthUnit toUnit) {
-            if (!Double.isFinite(value)) return 0.0;
-            double valueInInches = value * fromUnit.getConversionFactor();
-            double convertedValue = valueInInches / toUnit.getConversionFactor();
-            return Math.round(convertedValue * 1000000.0) / 1000000.0;
-        }
-
-        public static Length convert(Length length, LengthUnit toUnit) {
-            double newValue = convert(length.getValue(), length.getUnit(), toUnit);
-            return new Length(newValue, toUnit);
+            double convertedValue = totalInches / this.unit.getConversionFactor(); // Result in first operand's unit
+            return new Length(Math.round(convertedValue * 100.0) / 100.0, this.unit); // Rounded to 2 decimal places
         }
 
         @Override
@@ -59,54 +40,54 @@ public class QuantityMeasurementApp {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Length that = (Length) o;
-            return Double.compare(this.convertToBaseUnit(), that.convertToBaseUnit()) == 0;
+            double thisInches = Math.round(this.value * this.unit.getConversionFactor() * 100.0) / 100.0;
+            double thatInches = Math.round(that.value * that.unit.getConversionFactor() * 100.0) / 100.0;
+            return Double.compare(thisInches, thatInches) == 0;
         }
+
+        @Override
+        public String toString() { return value + " " + unit; }
     }
 
-    public static void main(String[] args) {
-        System.out.println("1.0 FEET to INCHES: " + Length.convert(1.0, LengthUnit.FEET, LengthUnit.INCHES));
-        System.out.println("3.0 YARDS to FEET: " + Length.convert(3.0, LengthUnit.YARDS, LengthUnit.FEET));
-        System.out.println("36.0 INCHES to YARDS: " + Length.convert(36.0, LengthUnit.INCHES, LengthUnit.YARDS));
-        System.out.println("1.0 CM to INCHES: " + Length.convert(1.0, LengthUnit.CENTIMETERS, LengthUnit.INCHES));
+    // API Helper for demonstration[cite: 6]
+    public static Length demonstrateLengthAddition(Length l1, Length l2) {
+        return l1.add(l2);
+    }
+
+    public static boolean demonstrateLengthEquality(Length l1, Length l2) {
+        return l1.equals(l2);
     }
 }
 
 class QuantityMeasurementAppTest {
-
     @Test
-    public void testFeetToInchesConversion() {
-        double result = QuantityMeasurementApp.Length.convert(1.0, QuantityMeasurementApp.LengthUnit.FEET, QuantityMeasurementApp.LengthUnit.INCHES);
-        assertEquals(12.0, result);
+    public void testAddFeetAndInches() {
+        // 1.0 FEET + 12.0 INCHES = 2.0 FEET[cite: 6]
+        QuantityMeasurementApp.Length length1 = new QuantityMeasurementApp.Length(1.0, QuantityMeasurementApp.LengthUnit.FEET);
+        QuantityMeasurementApp.Length length2 = new QuantityMeasurementApp.Length(12.0, QuantityMeasurementApp.LengthUnit.INCHES);
+
+        QuantityMeasurementApp.Length sum = QuantityMeasurementApp.demonstrateLengthAddition(length1, length2);
+        QuantityMeasurementApp.Length expected = new QuantityMeasurementApp.Length(2.0, QuantityMeasurementApp.LengthUnit.FEET);
+
+        assertTrue(QuantityMeasurementApp.demonstrateLengthEquality(sum, expected)); //[cite: 6]
     }
 
     @Test
-    public void testYardsToFeetConversion() {
-        double result = QuantityMeasurementApp.Length.convert(3.0, QuantityMeasurementApp.LengthUnit.YARDS, QuantityMeasurementApp.LengthUnit.FEET);
-        assertEquals(9.0, result);
+    public void testAddInchesAndFeet() {
+        // 12.0 INCHES + 1.0 FEET = 24.0 INCHES[cite: 6]
+        QuantityMeasurementApp.Length length1 = new QuantityMeasurementApp.Length(12.0, QuantityMeasurementApp.LengthUnit.INCHES);
+        QuantityMeasurementApp.Length length2 = new QuantityMeasurementApp.Length(1.0, QuantityMeasurementApp.LengthUnit.FEET);
+
+        QuantityMeasurementApp.Length sum = length1.add(length2);
+        assertEquals(24.0, sum.add(new QuantityMeasurementApp.Length(0, QuantityMeasurementApp.LengthUnit.INCHES)).add(new QuantityMeasurementApp.Length(0, QuantityMeasurementApp.LengthUnit.INCHES)).equals(new QuantityMeasurementApp.Length(24.0, QuantityMeasurementApp.LengthUnit.INCHES)) ? 24.0 : 0);
     }
 
     @Test
-    public void testInchesToYardsConversion() {
-        double result = QuantityMeasurementApp.Length.convert(36.0, QuantityMeasurementApp.LengthUnit.INCHES, QuantityMeasurementApp.LengthUnit.YARDS);
-        assertEquals(1.0, result);
-    }
+    public void testAdditionCommutativity() {
+        // add(A, B) should represent the same physical length as add(B, A)[cite: 6]
+        QuantityMeasurementApp.Length a = new QuantityMeasurementApp.Length(1.0, QuantityMeasurementApp.LengthUnit.FEET);
+        QuantityMeasurementApp.Length b = new QuantityMeasurementApp.Length(12.0, QuantityMeasurementApp.LengthUnit.INCHES);
 
-    @Test
-    public void testCentimetersToInchesConversion() {
-        double result = QuantityMeasurementApp.Length.convert(1.0, QuantityMeasurementApp.LengthUnit.CENTIMETERS, QuantityMeasurementApp.LengthUnit.INCHES);
-        assertEquals(0.393701, result);
-    }
-
-    @Test
-    public void testZeroValueConversion() {
-        double result = QuantityMeasurementApp.Length.convert(0.0, QuantityMeasurementApp.LengthUnit.FEET, QuantityMeasurementApp.LengthUnit.INCHES);
-        assertEquals(0.0, result);
-    }
-
-    @Test
-    public void testEqualityAfterConversion() {
-        QuantityMeasurementApp.Length oneFoot = new QuantityMeasurementApp.Length(1.0, QuantityMeasurementApp.LengthUnit.FEET);
-        QuantityMeasurementApp.Length convertedInches = QuantityMeasurementApp.Length.convert(oneFoot, QuantityMeasurementApp.LengthUnit.INCHES);
-        assertTrue(oneFoot.equals(convertedInches));
+        assertTrue(a.add(b).equals(b.add(a))); //[cite: 6]
     }
 }
