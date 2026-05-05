@@ -20,19 +20,28 @@ public class QuantityMeasurementApp {
             this.unit = unit;
         }
 
-        /**
-         * UC6: Addition of two lengths.
-         * Normalizes both to inches, adds them, and converts back to the unit of this instance.
-         */
-        public Length add(Length thatLength) {
-            if (thatLength == null) {
-                throw new IllegalArgumentException("Operand cannot be null"); //
-            }
-            double totalInches = (this.value * this.unit.getConversionFactor()) +
-                    (thatLength.value * thatLength.unit.getConversionFactor()); //
+        public double getValue() { return value; }
+        public LengthUnit getUnit() { return unit; }
 
-            double convertedValue = totalInches / this.unit.getConversionFactor(); // Result in first operand's unit
-            return new Length(Math.round(convertedValue * 100.0) / 100.0, this.unit); // Rounded to 2 decimal places
+        /**
+         * UC7: Addition with Explicit Target Unit.
+         * Adds two lengths and converts the sum to the specified target unit.
+         */
+        public static Length add(Length l1, Length l2, LengthUnit targetUnit) {
+            if (l1 == null || l2 == null || targetUnit == null) {
+                throw new IllegalArgumentException("Inputs and Target Unit cannot be null");
+            }
+
+            // Step 1: Convert both to base unit (Inches)
+            double sumInInches = (l1.value * l1.unit.getConversionFactor()) +
+                    (l2.value * l2.unit.getConversionFactor());
+
+            // Step 2: Convert sum to target unit
+            double convertedValue = sumInInches / targetUnit.getConversionFactor();
+
+            // Step 3: Round to 3 decimal places for precision handling
+            double roundedValue = Math.round(convertedValue * 1000.0) / 1000.0;
+            return new Length(roundedValue, targetUnit);
         }
 
         @Override
@@ -40,8 +49,8 @@ public class QuantityMeasurementApp {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Length that = (Length) o;
-            double thisInches = Math.round(this.value * this.unit.getConversionFactor() * 100.0) / 100.0;
-            double thatInches = Math.round(that.value * that.unit.getConversionFactor() * 100.0) / 100.0;
+            double thisInches = Math.round(this.value * this.unit.getConversionFactor() * 1000.0) / 1000.0;
+            double thatInches = Math.round(that.value * that.unit.getConversionFactor() * 1000.0) / 1000.0;
             return Double.compare(thisInches, thatInches) == 0;
         }
 
@@ -49,45 +58,53 @@ public class QuantityMeasurementApp {
         public String toString() { return value + " " + unit; }
     }
 
-    // API Helper for demonstration[cite: 6]
-    public static Length demonstrateLengthAddition(Length l1, Length l2) {
-        return l1.add(l2);
-    }
+    public static void main(String[] args) {
+        Length ft = new Length(1.0, LengthUnit.FEET);
+        Length in = new Length(12.0, LengthUnit.INCHES);
 
-    public static boolean demonstrateLengthEquality(Length l1, Length l2) {
-        return l1.equals(l2);
+        // Example: 1ft + 12in with target unit YARDS
+        Length result = Length.add(ft, in, LengthUnit.YARDS);
+        System.out.println("Result: " + result); // Output: ~0.667 YARDS
     }
 }
 
 class QuantityMeasurementAppTest {
+
     @Test
-    public void testAddFeetAndInches() {
-        // 1.0 FEET + 12.0 INCHES = 2.0 FEET[cite: 6]
-        QuantityMeasurementApp.Length length1 = new QuantityMeasurementApp.Length(1.0, QuantityMeasurementApp.LengthUnit.FEET);
-        QuantityMeasurementApp.Length length2 = new QuantityMeasurementApp.Length(12.0, QuantityMeasurementApp.LengthUnit.INCHES);
+    public void testAddition_ExplicitTargetUnit_LargeToSmallScale() {
+        // Add (1000.0 ft, 500.0 ft) with target unit INCHES -> 18000.0 INCHES
+        QuantityMeasurementApp.Length l1 = new QuantityMeasurementApp.Length(1000.0, QuantityMeasurementApp.LengthUnit.FEET);
+        QuantityMeasurementApp.Length l2 = new QuantityMeasurementApp.Length(500.0, QuantityMeasurementApp.LengthUnit.FEET);
 
-        QuantityMeasurementApp.Length sum = QuantityMeasurementApp.demonstrateLengthAddition(length1, length2);
-        QuantityMeasurementApp.Length expected = new QuantityMeasurementApp.Length(2.0, QuantityMeasurementApp.LengthUnit.FEET);
-
-        assertTrue(QuantityMeasurementApp.demonstrateLengthEquality(sum, expected)); //[cite: 6]
+        QuantityMeasurementApp.Length result = QuantityMeasurementApp.Length.add(l1, l2, QuantityMeasurementApp.LengthUnit.INCHES);
+        assertEquals(18000.0, result.getValue());
+        assertEquals(QuantityMeasurementApp.LengthUnit.INCHES, result.getUnit());
     }
 
     @Test
-    public void testAddInchesAndFeet() {
-        // 12.0 INCHES + 1.0 FEET = 24.0 INCHES[cite: 6]
-        QuantityMeasurementApp.Length length1 = new QuantityMeasurementApp.Length(12.0, QuantityMeasurementApp.LengthUnit.INCHES);
-        QuantityMeasurementApp.Length length2 = new QuantityMeasurementApp.Length(1.0, QuantityMeasurementApp.LengthUnit.FEET);
+    public void testAddition_ExplicitTargetUnit_SmallToLargeScale() {
+        // Add (12.0 in, 12.0 in) with target unit YARDS -> ~0.667 YARDS
+        QuantityMeasurementApp.Length l1 = new QuantityMeasurementApp.Length(12.0, QuantityMeasurementApp.LengthUnit.INCHES);
+        QuantityMeasurementApp.Length l2 = new QuantityMeasurementApp.Length(12.0, QuantityMeasurementApp.LengthUnit.INCHES);
 
-        QuantityMeasurementApp.Length sum = length1.add(length2);
-        assertEquals(24.0, sum.add(new QuantityMeasurementApp.Length(0, QuantityMeasurementApp.LengthUnit.INCHES)).add(new QuantityMeasurementApp.Length(0, QuantityMeasurementApp.LengthUnit.INCHES)).equals(new QuantityMeasurementApp.Length(24.0, QuantityMeasurementApp.LengthUnit.INCHES)) ? 24.0 : 0);
+        QuantityMeasurementApp.Length result = QuantityMeasurementApp.Length.add(l1, l2, QuantityMeasurementApp.LengthUnit.YARDS);
+        assertEquals(0.667, result.getValue());
     }
 
     @Test
-    public void testAdditionCommutativity() {
-        // add(A, B) should represent the same physical length as add(B, A)[cite: 6]
-        QuantityMeasurementApp.Length a = new QuantityMeasurementApp.Length(1.0, QuantityMeasurementApp.LengthUnit.FEET);
-        QuantityMeasurementApp.Length b = new QuantityMeasurementApp.Length(12.0, QuantityMeasurementApp.LengthUnit.INCHES);
+    public void testAddition_WithCmToFeet() {
+        // 30.48 cm + 30.48 cm = 60.96 cm. Result in FEET -> 2.0 FEET
+        QuantityMeasurementApp.Length l1 = new QuantityMeasurementApp.Length(30.48, QuantityMeasurementApp.LengthUnit.CENTIMETERS);
+        QuantityMeasurementApp.Length l2 = new QuantityMeasurementApp.Length(30.48, QuantityMeasurementApp.LengthUnit.CENTIMETERS);
 
-        assertTrue(a.add(b).equals(b.add(a))); //[cite: 6]
+        QuantityMeasurementApp.Length result = QuantityMeasurementApp.Length.add(l1, l2, QuantityMeasurementApp.LengthUnit.FEET);
+        assertEquals(2.0, result.getValue());
+    }
+
+    @Test
+    public void testAddition_NullCheck() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            QuantityMeasurementApp.Length.add(null, null, QuantityMeasurementApp.LengthUnit.FEET);
+        });
     }
 }
