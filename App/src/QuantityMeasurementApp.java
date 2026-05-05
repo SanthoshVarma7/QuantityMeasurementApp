@@ -3,38 +3,22 @@ import static org.junit.jupiter.api.Assertions.*;
 
 interface IMeasurable {
     double getConversionFactor();
-
-    default double convertToBase(double value) {
-        return value * getConversionFactor();
-    }
-
-    default double fromBase(double valueInBase) {
-        return valueInBase / getConversionFactor();
-    }
+    default double convertToBase(double v) { return v * getConversionFactor(); }
+    default double fromBase(double v) { return v / getConversionFactor(); }
 }
 
 enum LengthUnit implements IMeasurable {
-    FEET(12.0), INCHES(1.0), YARDS(36.0), CENTIMETERS(0.393701);
+    FEET(12.0), INCHES(1.0), YARDS(36.0);
     private final double factor;
-    LengthUnit(double factor) { this.factor = factor; }
+    LengthUnit(double f) { this.factor = f; }
     @Override public double getConversionFactor() { return factor; }
 }
 
 enum WeightUnit implements IMeasurable {
-    GRAM(1.0), KILOGRAM(1000.0), POUND(453.592), TONNE(1000000.0);
+    GRAM(1.0), KILOGRAM(1000.0);
     private final double factor;
-    WeightUnit(double factor) { this.factor = factor; }
+    WeightUnit(double f) { this.factor = f; }
     @Override public double getConversionFactor() { return factor; }
-}
-
-enum VolumeUnit implements IMeasurable {
-    LITRE(1.0), // Base Unit
-    MILLILITRE(0.001),
-    GALLON(3.78541);
-
-    private final double conversionFactor;
-    VolumeUnit(double conversionFactor) { this.conversionFactor = conversionFactor; }
-    @Override public double getConversionFactor() { return conversionFactor; }
 }
 
 class Quantity<U extends IMeasurable> {
@@ -42,7 +26,6 @@ class Quantity<U extends IMeasurable> {
     private final U unit;
 
     public Quantity(double value, U unit) {
-        if (unit == null) throw new IllegalArgumentException();
         this.value = value;
         this.unit = unit;
     }
@@ -50,14 +33,19 @@ class Quantity<U extends IMeasurable> {
     public double getValue() { return value; }
 
     private double getInBaseUnit() {
-        double raw = unit.convertToBase(value);
-        return Math.round(raw * 1000.0) / 1000.0;
+        return Math.round(unit.convertToBase(value) * 1000.0) / 1000.0;
     }
 
-    public Quantity<U> add(Quantity<U> that, U targetUnit) {
-        double totalBase = this.getInBaseUnit() + that.getInBaseUnit();
-        double converted = targetUnit.fromBase(totalBase);
+    public Quantity<U> subtract(Quantity<U> that, U targetUnit) {
+        double diffInBase = this.getInBaseUnit() - that.getInBaseUnit();
+        double converted = targetUnit.fromBase(diffInBase);
         return new Quantity<>(Math.round(converted * 1000.0) / 1000.0, targetUnit);
+    }
+
+    public double divide(Quantity<U> that) {
+        double divisor = that.getInBaseUnit();
+        if (divisor == 0) throw new IllegalArgumentException("Division by zero");
+        return this.getInBaseUnit() / divisor;
     }
 
     @Override
@@ -65,7 +53,6 @@ class Quantity<U extends IMeasurable> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Quantity<?> that = (Quantity<?>) o;
-        if (!this.unit.getClass().equals(that.unit.getClass())) return false;
         return Double.compare(this.getInBaseUnit(), that.getInBaseUnit()) == 0;
     }
 
@@ -75,44 +62,38 @@ class Quantity<U extends IMeasurable> {
 
 public class QuantityMeasurementApp {
     public static void main(String[] args) {
-        Quantity<VolumeUnit> gallon = new Quantity<>(1.0, VolumeUnit.GALLON);
-        Quantity<VolumeUnit> litres = new Quantity<>(3.785, VolumeUnit.LITRE);
-        System.out.println("1 Gallon == 3.785 Litres: " + gallon.equals(litres));
+        Quantity<LengthUnit> tenFeet = new Quantity<>(10.0, LengthUnit.FEET);
+        Quantity<LengthUnit> sixInches = new Quantity<>(6.0, LengthUnit.INCHES);
 
-        Quantity<VolumeUnit> ml = new Quantity<>(1000.0, VolumeUnit.MILLILITRE);
-        Quantity<VolumeUnit> l = new Quantity<>(1.0, VolumeUnit.LITRE);
-        System.out.println("1000ml + 1L in Litres: " + ml.add(l, VolumeUnit.LITRE));
+        Quantity<LengthUnit> diff = tenFeet.subtract(sixInches, LengthUnit.FEET);
+        System.out.println("10ft - 6in = " + diff); // 9.5 FEET
+
+        Quantity<WeightUnit> tenKg = new Quantity<>(10.0, WeightUnit.KILOGRAM);
+        Quantity<WeightUnit> fiveKg = new Quantity<>(5.0, WeightUnit.KILOGRAM);
+        System.out.println("10kg / 5kg = " + tenKg.divide(fiveKg)); // 2.0
     }
 }
 
 class QuantityMeasurementAppTest {
-
     @Test
-    public void testVolumeEquality() {
-        Quantity<VolumeUnit> l = new Quantity<>(1.0, VolumeUnit.LITRE);
-        Quantity<VolumeUnit> ml = new Quantity<>(1000.0, VolumeUnit.MILLILITRE);
-        assertTrue(l.equals(ml));
+    public void testSubtraction() {
+        Quantity<LengthUnit> l1 = new Quantity<>(10.0, LengthUnit.FEET);
+        Quantity<LengthUnit> l2 = new Quantity<>(6.0, LengthUnit.INCHES);
+        Quantity<LengthUnit> result = l1.subtract(l2, LengthUnit.FEET);
+        assertEquals(9.5, result.getValue());
     }
 
     @Test
-    public void testGallonToLitreEquality() {
-        Quantity<VolumeUnit> gal = new Quantity<>(1.0, VolumeUnit.GALLON);
-        Quantity<VolumeUnit> litre = new Quantity<>(3.785, VolumeUnit.LITRE);
-        assertTrue(gal.equals(litre));
+    public void testDivision() {
+        Quantity<WeightUnit> w1 = new Quantity<>(10.0, WeightUnit.KILOGRAM);
+        Quantity<WeightUnit> w2 = new Quantity<>(5.0, WeightUnit.KILOGRAM);
+        assertEquals(2.0, w1.divide(w2));
     }
 
     @Test
-    public void testVolumeAddition() {
-        Quantity<VolumeUnit> l = new Quantity<>(1.0, VolumeUnit.LITRE);
-        Quantity<VolumeUnit> gal = new Quantity<>(1.0, VolumeUnit.GALLON); // 3.785L
-        Quantity<VolumeUnit> result = l.add(gal, VolumeUnit.LITRE);
-        assertEquals(4.785, result.getValue());
-    }
-
-    @Test
-    public void testCrossCategorySafety() {
-        Quantity<VolumeUnit> volume = new Quantity<>(1.0, VolumeUnit.LITRE);
-        Quantity<WeightUnit> weight = new Quantity<>(1.0, WeightUnit.KILOGRAM);
-        assertFalse(volume.equals(weight));
+    public void testDivisionByZero() {
+        Quantity<WeightUnit> w1 = new Quantity<>(10.0, WeightUnit.KILOGRAM);
+        Quantity<WeightUnit> w2 = new Quantity<>(0.0, WeightUnit.KILOGRAM);
+        assertThrows(IllegalArgumentException.class, () -> w1.divide(w2));
     }
 }
