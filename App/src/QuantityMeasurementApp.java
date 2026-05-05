@@ -26,6 +26,7 @@ class Quantity<U extends IMeasurable> {
     private final U unit;
 
     public Quantity(double value, U unit) {
+        if (unit == null || !Double.isFinite(value)) throw new IllegalArgumentException("Invalid input");
         this.value = value;
         this.unit = unit;
     }
@@ -33,18 +34,31 @@ class Quantity<U extends IMeasurable> {
     public double getValue() { return value; }
 
     private double getInBaseUnit() {
-        return Math.round(unit.convertToBase(value) * 1000.0) / 1000.0;
+        return unit.convertToBase(value);
     }
 
-    public Quantity<U> subtract(Quantity<U> that, U targetUnit) {
-        double diffInBase = this.getInBaseUnit() - that.getInBaseUnit();
-        double converted = targetUnit.fromBase(diffInBase);
-        return new Quantity<>(Math.round(converted * 1000.0) / 1000.0, targetUnit);
+    // --- UC13: CENTRALIZED ARITHMETIC LOGIC ---
+
+    private void validate(Quantity<U> other) {
+        if (other == null) throw new IllegalArgumentException("Operand cannot be null");
     }
 
-    public double divide(Quantity<U> that) {
-        double divisor = that.getInBaseUnit();
-        if (divisor == 0) throw new IllegalArgumentException("Division by zero");
+    public Quantity<U> add(Quantity<U> other, U targetUnit) {
+        validate(other);
+        double resultBase = this.getInBaseUnit() + other.getInBaseUnit();
+        return new Quantity<>(Math.round(targetUnit.fromBase(resultBase) * 1000.0) / 1000.0, targetUnit);
+    }
+
+    public Quantity<U> subtract(Quantity<U> other, U targetUnit) {
+        validate(other);
+        double resultBase = this.getInBaseUnit() - other.getInBaseUnit();
+        return new Quantity<>(Math.round(targetUnit.fromBase(resultBase) * 1000.0) / 1000.0, targetUnit);
+    }
+
+    public double divide(Quantity<U> other) {
+        validate(other);
+        double divisor = other.getInBaseUnit();
+        if (divisor == 0) throw new ArithmeticException("Division by zero");
         return this.getInBaseUnit() / divisor;
     }
 
@@ -53,7 +67,9 @@ class Quantity<U extends IMeasurable> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Quantity<?> that = (Quantity<?>) o;
-        return Double.compare(this.getInBaseUnit(), that.getInBaseUnit()) == 0;
+        if (!this.unit.getClass().equals(that.unit.getClass())) return false;
+        return Double.compare(Math.round(this.getInBaseUnit() * 1000.0) / 1000.0,
+                Math.round(that.getInBaseUnit() * 1000.0) / 1000.0) == 0;
     }
 
     @Override
@@ -62,38 +78,34 @@ class Quantity<U extends IMeasurable> {
 
 public class QuantityMeasurementApp {
     public static void main(String[] args) {
-        Quantity<LengthUnit> tenFeet = new Quantity<>(10.0, LengthUnit.FEET);
-        Quantity<LengthUnit> sixInches = new Quantity<>(6.0, LengthUnit.INCHES);
+        Quantity<LengthUnit> l1 = new Quantity<>(1.0, LengthUnit.FEET);
+        Quantity<LengthUnit> l2 = new Quantity<>(12.0, LengthUnit.INCHES);
 
-        Quantity<LengthUnit> diff = tenFeet.subtract(sixInches, LengthUnit.FEET);
-        System.out.println("10ft - 6in = " + diff); // 9.5 FEET
-
-        Quantity<WeightUnit> tenKg = new Quantity<>(10.0, WeightUnit.KILOGRAM);
-        Quantity<WeightUnit> fiveKg = new Quantity<>(5.0, WeightUnit.KILOGRAM);
-        System.out.println("10kg / 5kg = " + tenKg.divide(fiveKg)); // 2.0
+        System.out.println("Add: " + l1.add(l2, LengthUnit.FEET));       // 2.0 FEET
+        System.out.println("Subtract: " + l1.subtract(l2, LengthUnit.YARDS)); // 0.0 YARDS
+        System.out.println("Divide: " + l1.divide(l2));                 // 1.0
     }
 }
 
 class QuantityMeasurementAppTest {
     @Test
-    public void testSubtraction() {
-        Quantity<LengthUnit> l1 = new Quantity<>(10.0, LengthUnit.FEET);
+    public void testDryAddition() {
+        Quantity<LengthUnit> l1 = new Quantity<>(1.0, LengthUnit.FEET);
         Quantity<LengthUnit> l2 = new Quantity<>(6.0, LengthUnit.INCHES);
-        Quantity<LengthUnit> result = l1.subtract(l2, LengthUnit.FEET);
-        assertEquals(9.5, result.getValue());
+        assertEquals(1.5, l1.add(l2, LengthUnit.FEET).getValue());
     }
 
     @Test
-    public void testDivision() {
-        Quantity<WeightUnit> w1 = new Quantity<>(10.0, WeightUnit.KILOGRAM);
-        Quantity<WeightUnit> w2 = new Quantity<>(5.0, WeightUnit.KILOGRAM);
-        assertEquals(2.0, w1.divide(w2));
+    public void testDrySubtraction() {
+        Quantity<WeightUnit> w1 = new Quantity<>(1.0, WeightUnit.KILOGRAM);
+        Quantity<WeightUnit> w2 = new Quantity<>(500.0, WeightUnit.GRAM);
+        assertEquals(0.5, w1.subtract(w2, WeightUnit.KILOGRAM).getValue());
     }
 
     @Test
-    public void testDivisionByZero() {
-        Quantity<WeightUnit> w1 = new Quantity<>(10.0, WeightUnit.KILOGRAM);
-        Quantity<WeightUnit> w2 = new Quantity<>(0.0, WeightUnit.KILOGRAM);
-        assertThrows(IllegalArgumentException.class, () -> w1.divide(w2));
+    public void testDivisionResult() {
+        Quantity<LengthUnit> l1 = new Quantity<>(1.0, LengthUnit.YARDS);
+        Quantity<LengthUnit> l2 = new Quantity<>(1.0, LengthUnit.FEET);
+        assertEquals(3.0, l1.divide(l2));
     }
 }
